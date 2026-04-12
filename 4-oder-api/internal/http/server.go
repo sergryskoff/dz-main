@@ -3,10 +3,11 @@ package http
 
 import (
 	"context"
-	"log/slog"
+	"log"
 	"net/http"
 	"order-api/config"
 	"order-api/internal/product"
+
 	"order-api/pkg/db"
 )
 
@@ -16,9 +17,14 @@ func Run(ctx context.Context) error {
 
 	data := db.NewDB(cfg)
 
-	_ = product.NewProductRepository(data.DB) //далее переменную передадим в handler
+	//Repo
+	repo := product.NewProductRepository(data)
 
+	//Router
 	r := http.NewServeMux()
+
+	//Handlers
+	product.NewProductHandler(r, repo)
 
 	s := http.Server{
 		Addr:    cfg.ServerAddr,
@@ -27,11 +33,11 @@ func Run(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		slog.Info("Shutting down server ...")
+		log.Println("Shutting down server ...")
 		s.Shutdown(ctx)
 	}()
 
-	slog.Info("Starting server ...", slog.String("addr", cfg.ServerAddr))
+	log.Println("Starting server on port:", cfg.ServerAddr)
 	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
 	}
