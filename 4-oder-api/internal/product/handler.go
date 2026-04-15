@@ -3,8 +3,8 @@ package product
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+	"order-api/pkg/middleware"
 	"order-api/pkg/req"
 	"order-api/pkg/res"
 	"strconv"
@@ -34,7 +34,10 @@ func (l *ProductHandler) Create() http.HandlerFunc {
 		productRequst, err := req.HandleBody[ProductRequest](&w, r)
 		if err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
-			log.Printf("Bad request error: %v\n", err)
+			middleware.LogError("Bad request error", map[string]interface{}{
+				"error": err.Error(),
+				"path":  r.URL.Path,
+			})
 			return
 		}
 
@@ -50,16 +53,26 @@ func (l *ProductHandler) Create() http.HandlerFunc {
 		existedProduct, _ := l.Repo.GetByName(productRequst.Name)
 		if existedProduct != nil {
 			res.Json(w, "Product exist", http.StatusFound)
-			log.Printf("Product exist, Name %s\n", productRequst.Name)
+			middleware.LogWarn("Product already exists", map[string]interface{}{
+				"name": productRequst.Name,
+				"path": r.URL.Path,
+			})
 			return
 		}
 
 		createProduct, err := l.Repo.Create(&product)
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Printf("Error creating product: %v\n", err)
+			middleware.LogError("Error creating product", map[string]interface{}{
+				"error": err.Error(),
+				"path":  r.URL.Path,
+			})
 			return
 		}
+		middleware.LogInfo("Product created successfully", map[string]interface{}{
+			"product_id": createProduct.ID,
+			"path":       r.URL.Path,
+		})
 		res.Json(w, createProduct, http.StatusCreated)
 	}
 }
@@ -69,8 +82,10 @@ func (l *ProductHandler) Update() http.HandlerFunc {
 		productRequst, err := req.HandleBody[ProductRequest](&w, r)
 		if err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
-			log.Printf("Bad request error: %v\n", err)
-
+			middleware.LogError("Bad request error", map[string]interface{}{
+				"error": err.Error(),
+				"path":  r.URL.Path,
+			})
 			return
 		}
 
@@ -78,7 +93,11 @@ func (l *ProductHandler) Update() http.HandlerFunc {
 		id, err := strconv.ParseUint(idString, 10, 32)
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
-			log.Printf("Error parse ID: %v\n", err)
+			middleware.LogError("Error parsing ID", map[string]interface{}{
+				"error": err.Error(),
+				"id":    idString,
+				"path":  r.URL.Path,
+			})
 			return
 		}
 
@@ -95,9 +114,17 @@ func (l *ProductHandler) Update() http.HandlerFunc {
 		productUpdated, err := l.Repo.Update(&product)
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Printf("Error updating product: %v\n", err)
+			middleware.LogError("Error updating product", map[string]interface{}{
+				"error": err.Error(),
+				"id":    id,
+				"path":  r.URL.Path,
+			})
 			return
 		}
+		middleware.LogInfo("Product updated successfully", map[string]interface{}{
+			"product_id": productUpdated.ID,
+			"path":       r.URL.Path,
+		})
 		res.Json(w, productUpdated, http.StatusCreated)
 	}
 }
@@ -108,24 +135,37 @@ func (l *ProductHandler) Delete() http.HandlerFunc {
 		id, err := strconv.ParseUint(idString, 10, 32)
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
-			log.Printf("Error parse ID: %v\n", err)
-
+			middleware.LogError("Error parsing ID", map[string]interface{}{
+				"error": err.Error(),
+				"id":    idString,
+				"path":  r.URL.Path,
+			})
 			return
 		}
 		_, err = l.Repo.GetById(uint(id))
 		if err != nil {
 			http.Error(w, "Product not exist", http.StatusNotFound)
-			log.Printf("Product not exist, ID %d\n", id)
+			middleware.LogWarn("Product not found", map[string]interface{}{
+				"id":   id,
+				"path": r.URL.Path,
+			})
 			return
 		}
 		err = l.Repo.Delete(uint(id))
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Printf("Error deleting product: %v\n", err)
+			middleware.LogError("Error deleting product", map[string]interface{}{
+				"error": err.Error(),
+				"id":    id,
+				"path":  r.URL.Path,
+			})
 			return
 		}
 		info := fmt.Sprintf("Delete product with ID: %d", id)
-		log.Printf("Delete product with ID: %d\n", id)
+		middleware.LogInfo("Product deleted successfully", map[string]interface{}{
+			"id":   id,
+			"path": r.URL.Path,
+		})
 		res.Json(w, info, http.StatusOK)
 	}
 }
@@ -136,15 +176,26 @@ func (l *ProductHandler) GetProductById() http.HandlerFunc {
 		id, err := strconv.ParseUint(idString, 10, 32)
 		if err != nil {
 			http.Error(w, "Invalid ID", http.StatusBadRequest)
-			log.Printf("Error parse ID: %v\n", err)
+			middleware.LogError("Error parsing ID", map[string]interface{}{
+				"error": err.Error(),
+				"id":    idString,
+				"path":  r.URL.Path,
+			})
 			return
 		}
 		product, err := l.Repo.GetById(uint(id))
 		if err != nil {
 			http.Error(w, "Product not exist", http.StatusNotFound)
-			log.Printf("Product not exist, ID %d\n", id)
+			middleware.LogWarn("Product not found", map[string]interface{}{
+				"id":   id,
+				"path": r.URL.Path,
+			})
 			return
 		}
+		middleware.LogInfo("Product retrieved successfully", map[string]interface{}{
+			"id":   id,
+			"path": r.URL.Path,
+		})
 		res.Json(w, product, http.StatusOK)
 	}
 }
@@ -154,9 +205,16 @@ func (l *ProductHandler) GetAll() http.HandlerFunc {
 		products, err := l.Repo.GetAll()
 		if err != nil {
 			http.Error(w, "Failed to fetch products", http.StatusInternalServerError)
-			log.Printf("Failed to fetch products: %v\n", err)
+			middleware.LogError("Failed to fetch products", map[string]interface{}{
+				"error": err.Error(),
+				"path":  r.URL.Path,
+			})
 			return
 		}
+		middleware.LogInfo("Products retrieved successfully", map[string]interface{}{
+			"count": len(products),
+			"path":  r.URL.Path,
+		})
 		res.Json(w, products, http.StatusOK)
 	}
 }

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"order-api/config"
 	"order-api/internal/product"
-
 	"order-api/pkg/db"
+	"order-api/pkg/middleware"
 )
 
 // запуск сервера, отслеживание закрытия контекста
@@ -26,9 +26,12 @@ func Run(ctx context.Context) error {
 	//Handlers
 	product.NewProductHandler(r, repo)
 
+	// Logging middleware
+	handlerWithLogging := middleware.LoggingMiddleware(r)
+
 	s := http.Server{
 		Addr:    cfg.ServerAddr,
-		Handler: r,
+		Handler: handlerWithLogging,
 	}
 
 	go func() {
